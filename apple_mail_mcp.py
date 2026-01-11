@@ -320,6 +320,87 @@ def get_email_with_content(
 
 
 @mcp.tool()
+def get_email_source(
+    account: str,
+    subject_keyword: Optional[str] = None,
+    message_id: Optional[str] = None,
+    mailbox: str = "INBOX"
+) -> str:
+    """
+    Get the raw RFC 822 source of an email including all headers and MIME parts.
+
+    Specify either subject_keyword OR message_id to find the email.
+    message_id is more precise (use the ID returned by list_inbox_emails, search_emails, etc.)
+
+    Returns the complete email source with:
+    - All headers (Return-Path, Received, MIME-Version, etc.)
+    - MIME structure with boundaries
+    - text/plain and text/html parts
+    - Attachment metadata (binary data may be truncated)
+
+    Useful for:
+    - Accessing HTML content
+    - Debugging email issues
+    - Extracting specific headers
+    - Email forensics
+    """
+    if not subject_keyword and not message_id:
+        return "Error: Either subject_keyword or message_id is required"
+
+    # Build the matching condition
+    if message_id:
+        escaped_id = message_id.replace('"', '\\"')
+        match_condition = f'message id of aMessage is "{escaped_id}"'
+        search_desc = f"message_id: {message_id}"
+    else:
+        escaped_keyword = subject_keyword.replace('"', '\\"')
+        match_condition = f'messageSubject contains "{escaped_keyword}"'
+        search_desc = f"subject: {subject_keyword}"
+
+    script = f'''
+    tell application "Mail"
+        try
+            set targetAccount to account "{account}"
+            try
+                set targetMailbox to mailbox "{mailbox}" of targetAccount
+            on error
+                if "{mailbox}" is "INBOX" then
+                    set targetMailbox to mailbox "Inbox" of targetAccount
+                else
+                    error "Mailbox not found: {mailbox}"
+                end if
+            end try
+
+            set mailboxMessages to every message of targetMailbox
+            set foundMessage to missing value
+
+            repeat with aMessage in mailboxMessages
+                try
+                    set messageSubject to subject of aMessage
+                    if {match_condition} then
+                        set foundMessage to aMessage
+                        exit repeat
+                    end if
+                end try
+            end repeat
+
+            if foundMessage is missing value then
+                return "Error: No email found matching {search_desc}"
+            end if
+
+            return source of foundMessage
+
+        on error errMsg
+            return "Error: " & errMsg
+        end try
+    end tell
+    '''
+
+    result = run_applescript(script)
+    return result
+
+
+@mcp.tool()
 @inject_preferences
 def get_unread_count() -> Dict[str, int]:
     """
