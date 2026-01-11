@@ -66,6 +66,8 @@ def parse_email_list(output: str) -> List[Dict[str, Any]]:
                 'subject': subject,
                 'is_read': is_read
             }
+        elif line.startswith('ID:'):
+            current_email['id'] = line[3:].strip()
         elif line.startswith('From:'):
             current_email['sender'] = line[5:].strip()
         elif line.startswith('Date:'):
@@ -137,6 +139,7 @@ def list_inbox_emails(
                             set messageSender to sender of aMessage
                             set messageDate to date received of aMessage
                             set messageRead to read status of aMessage
+                            set messageId to message id of aMessage
 
                             set shouldInclude to true
                             if not {str(include_read).lower()} and messageRead then
@@ -151,6 +154,7 @@ def list_inbox_emails(
                                 end if
 
                                 set outputText to outputText & readIndicator & " " & messageSubject & return
+                                set outputText to outputText & "   ID: " & messageId & return
                                 set outputText to outputText & "   From: " & messageSender & return
                                 set outputText to outputText & "   Date: " & (messageDate as string) & return
                                 set outputText to outputText & return
@@ -257,6 +261,7 @@ def get_email_with_content(
                             set messageSender to sender of aMessage
                             set messageDate to date received of aMessage
                             set messageRead to read status of aMessage
+                            set messageId to message id of aMessage
 
                             if messageRead then
                                 set readIndicator to "✓"
@@ -265,6 +270,7 @@ def get_email_with_content(
                             end if
 
                             set outputText to outputText & readIndicator & " " & messageSubject & return
+                            set outputText to outputText & "   ID: " & messageId & return
                             set outputText to outputText & "   From: " & messageSender & return
                             set outputText to outputText & "   Date: " & (messageDate as string) & return
                             set outputText to outputText & "   Mailbox: " & mailboxName & return
@@ -458,6 +464,7 @@ def get_recent_emails(
                     set messageSender to sender of aMessage
                     set messageDate to date received of aMessage
                     set messageRead to read status of aMessage
+                    set messageId to message id of aMessage
 
                     if messageRead then
                         set readIndicator to "✓"
@@ -466,6 +473,7 @@ def get_recent_emails(
                     end if
 
                     set outputText to outputText & readIndicator & " " & messageSubject & return
+                    set outputText to outputText & "   ID: " & messageId & return
                     set outputText to outputText & "   From: " & messageSender & return
                     set outputText to outputText & "   Date: " & (messageDate as string) & return
 
@@ -920,8 +928,10 @@ def list_email_attachments(
                     if messageSubject contains "{subject_keyword}" then
                         set messageSender to sender of aMessage
                         set messageDate to date received of aMessage
+                        set messageId to message id of aMessage
 
                         set outputText to outputText & "✉ " & messageSubject & return
+                        set outputText to outputText & "   ID: " & messageId & return
                         set outputText to outputText & "   From: " & messageSender & return
                         set outputText to outputText & "   Date: " & (messageDate as string) & return & return
 
@@ -1186,9 +1196,10 @@ def get_inbox_overview() -> str:
                         set messageSender to sender of aMessage
                         set messageDate to date received of aMessage
                         set messageRead to read status of aMessage
+                        set messageId to message id of aMessage
 
                         -- Create message record
-                        set messageRecord to {accountName:accountName, msgSubject:messageSubject, msgSender:messageSender, msgDate:messageDate, msgRead:messageRead}
+                        set messageRecord to {accountName:accountName, msgSubject:messageSubject, msgSender:messageSender, msgDate:messageDate, msgRead:messageRead, msgId:messageId}
                         set end of allRecentMessages to messageRecord
                     end try
                 end repeat
@@ -1207,6 +1218,7 @@ def get_inbox_overview() -> str:
             end if
 
             set outputText to outputText & return & readIndicator & " " & msgSubject of msgRecord & return
+            set outputText to outputText & "   ID: " & msgId of msgRecord & return
             set outputText to outputText & "   Account: " & accountName of msgRecord & return
             set outputText to outputText & "   From: " & msgSender of msgRecord & return
             set outputText to outputText & "   Date: " & (msgDate of msgRecord as string) & return
@@ -1370,6 +1382,7 @@ def search_emails(
                         set messageSender to sender of aMessage
                         set messageDate to date received of aMessage
                         set messageRead to read status of aMessage
+                        set messageId to message id of aMessage
 
                         -- Apply search conditions
                         if {condition_str} then
@@ -1379,6 +1392,7 @@ def search_emails(
                             end if
 
                             set outputText to outputText & readIndicator & " " & messageSubject & return
+                            set outputText to outputText & "   ID: " & messageId & return
                             set outputText to outputText & "   From: " & messageSender & return
                             set outputText to outputText & "   Date: " & (messageDate as string) & return
                             set outputText to outputText & "   Mailbox: " & mailboxName & return
@@ -1883,6 +1897,7 @@ def get_email_thread(
                     set messageSender to sender of aMessage
                     set messageDate to date received of aMessage
                     set messageRead to read status of aMessage
+                    set messageId to message id of aMessage
 
                     if messageRead then
                         set readIndicator to "✓"
@@ -1891,6 +1906,7 @@ def get_email_thread(
                     end if
 
                     set outputText to outputText & readIndicator & " " & messageSubject & return
+                    set outputText to outputText & "   ID: " & messageId & return
                     set outputText to outputText & "   From: " & messageSender & return
                     set outputText to outputText & "   Date: " & (messageDate as string) & return
 
@@ -1974,8 +1990,10 @@ def manage_drafts(
                     try
                         set draftSubject to subject of aDraft
                         set draftDate to date sent of aDraft
+                        set draftId to message id of aDraft
 
                         set outputText to outputText & "✉ " & draftSubject & return
+                        set outputText to outputText & "   ID: " & draftId & return
                         set outputText to outputText & "   Created: " & (draftDate as string) & return & return
                     end try
                 end repeat
@@ -2472,6 +2490,7 @@ def export_emails(
                     set messageSender to sender of foundMessage
                     set messageDate to date received of foundMessage
                     set messageContent to content of foundMessage
+                    set messageId to message id of foundMessage
 
                     -- Create safe filename
                     set safeSubject to messageSubject
@@ -2487,12 +2506,14 @@ def export_emails(
                     -- Prepare export content
                     if "{format}" is "txt" then
                         set exportContent to "Subject: " & messageSubject & return
+                        set exportContent to exportContent & "ID: " & messageId & return
                         set exportContent to exportContent & "From: " & messageSender & return
                         set exportContent to exportContent & "Date: " & (messageDate as string) & return & return
                         set exportContent to exportContent & messageContent
                     else if "{format}" is "html" then
                         set exportContent to "<html><body>"
                         set exportContent to exportContent & "<h2>" & messageSubject & "</h2>"
+                        set exportContent to exportContent & "<p><strong>ID:</strong> " & messageId & "</p>"
                         set exportContent to exportContent & "<p><strong>From:</strong> " & messageSender & "</p>"
                         set exportContent to exportContent & "<p><strong>Date:</strong> " & (messageDate as string) & "</p>"
                         set exportContent to exportContent & "<hr>" & messageContent
@@ -2507,6 +2528,7 @@ def export_emails(
 
                     set outputText to outputText & "✓ Email exported successfully!" & return & return
                     set outputText to outputText & "Subject: " & messageSubject & return
+                    set outputText to outputText & "ID: " & messageId & return
                     set outputText to outputText & "Saved to: " & filePath & return
 
                 else
@@ -2556,6 +2578,7 @@ def export_emails(
                         set messageSender to sender of aMessage
                         set messageDate to date received of aMessage
                         set messageContent to content of aMessage
+                        set messageId to message id of aMessage
 
                         -- Create safe filename with index
                         set exportCount to exportCount + 1
@@ -2573,12 +2596,14 @@ def export_emails(
                         -- Prepare export content
                         if "{format}" is "txt" then
                             set exportContent to "Subject: " & messageSubject & return
+                            set exportContent to exportContent & "ID: " & messageId & return
                             set exportContent to exportContent & "From: " & messageSender & return
                             set exportContent to exportContent & "Date: " & (messageDate as string) & return & return
                             set exportContent to exportContent & messageContent
                         else if "{format}" is "html" then
                             set exportContent to "<html><body>"
                             set exportContent to exportContent & "<h2>" & messageSubject & "</h2>"
+                            set exportContent to exportContent & "<p><strong>ID:</strong> " & messageId & "</p>"
                             set exportContent to exportContent & "<p><strong>From:</strong> " & messageSender & "</p>"
                             set exportContent to exportContent & "<p><strong>Date:</strong> " & (messageDate as string) & "</p>"
                             set exportContent to exportContent & "<hr>" & messageContent
