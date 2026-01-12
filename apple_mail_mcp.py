@@ -671,24 +671,39 @@ def list_mailboxes(
 @inject_preferences
 def move_email(
     account: str,
-    subject_keyword: str,
     to_mailbox: str,
+    subject_keyword: Optional[str] = None,
+    message_id: Optional[str] = None,
     from_mailbox: str = "INBOX",
     max_moves: int = 1
 ) -> str:
     """
-    Move email(s) matching a subject keyword from one mailbox to another.
+    Move email(s) from one mailbox to another.
+
+    Specify either subject_keyword OR message_id to find the email(s).
+    message_id provides exact matching (use the ID from list_inbox_emails, search_emails, etc.)
 
     Args:
         account: Account name (e.g., "Gmail", "Work")
-        subject_keyword: Keyword to search for in email subjects
         to_mailbox: Destination mailbox name. For nested mailboxes, use "/" separator (e.g., "Projects/Amplify Impact")
+        subject_keyword: Keyword to search for in email subjects (substring match)
+        message_id: Exact message ID for precise matching (e.g., "<abc123@example.com>")
         from_mailbox: Source mailbox name (default: "INBOX")
         max_moves: Maximum number of emails to move (default: 1, safety limit)
 
     Returns:
         Confirmation message with details of moved emails
     """
+    if not subject_keyword and not message_id:
+        return "Error: Either subject_keyword or message_id is required"
+
+    # Build the matching condition
+    if message_id:
+        escaped_id = message_id.replace('"', '\\"')
+        match_condition = f'message id of aMessage is "{escaped_id}"'
+    else:
+        escaped_keyword = subject_keyword.replace('"', '\\"')
+        match_condition = f'messageSubject contains "{escaped_keyword}"'
 
     # Parse nested mailbox path
     mailbox_parts = to_mailbox.split('/')
@@ -732,8 +747,8 @@ def move_email(
                 try
                     set messageSubject to subject of aMessage
 
-                    -- Check if subject contains keyword (case insensitive)
-                    if messageSubject contains "{subject_keyword}" then
+                    -- Check if message matches criteria
+                    if {match_condition} then
                         set messageSender to sender of aMessage
                         set messageDate to date received of aMessage
 
