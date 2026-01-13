@@ -984,24 +984,41 @@ def compose_email(
 @inject_preferences
 def list_email_attachments(
     account: str,
-    subject_keyword: str,
+    subject_keyword: Optional[str] = None,
+    message_id: Optional[str] = None,
     max_results: int = 1
 ) -> str:
     """
-    List attachments for emails matching a subject keyword.
+    List attachments for emails matching a subject keyword or message ID.
+
+    Specify either subject_keyword OR message_id to find the email(s).
+    message_id provides exact matching (use the ID from list_inbox_emails, search_emails, etc.)
 
     Args:
         account: Account name (e.g., "Gmail", "Work", "Personal")
-        subject_keyword: Keyword to search for in email subjects
+        subject_keyword: Keyword to search for in email subjects (substring match)
+        message_id: Exact message ID for precise matching (e.g., "<abc123@example.com>")
         max_results: Maximum number of matching emails to check (default: 1)
 
     Returns:
         List of attachments with their names and sizes
     """
+    if not subject_keyword and not message_id:
+        return "Error: Either subject_keyword or message_id is required"
+
+    # Build the matching condition
+    if message_id:
+        escaped_id = message_id.replace('"', '\\"')
+        match_condition = f'message id of aMessage is "{escaped_id}"'
+        search_label = f"ID: {message_id}"
+    else:
+        escaped_keyword = subject_keyword.replace('"', '\\"')
+        match_condition = f'messageSubject contains "{escaped_keyword}"'
+        search_label = subject_keyword
 
     script = f'''
     tell application "Mail"
-        set outputText to "ATTACHMENTS FOR: {subject_keyword}" & return & return
+        set outputText to "ATTACHMENTS FOR: {search_label}" & return & return
         set resultCount to 0
 
         try
@@ -1020,8 +1037,8 @@ def list_email_attachments(
                 try
                     set messageSubject to subject of aMessage
 
-                    -- Check if subject contains keyword
-                    if messageSubject contains "{subject_keyword}" then
+                    -- Check if message matches criteria
+                    if {match_condition} then
                         set messageSender to sender of aMessage
                         set messageDate to date received of aMessage
                         set messageId to message id of aMessage
@@ -1078,22 +1095,39 @@ def list_email_attachments(
 @inject_preferences
 def save_email_attachment(
     account: str,
-    subject_keyword: str,
     attachment_name: str,
-    save_path: str
+    save_path: str,
+    subject_keyword: Optional[str] = None,
+    message_id: Optional[str] = None
 ) -> str:
     """
     Save a specific attachment from an email to disk.
 
+    Specify either subject_keyword OR message_id to find the email.
+    message_id provides exact matching (use the ID from list_inbox_emails, search_emails, etc.)
+
     Args:
         account: Account name (e.g., "Gmail", "Work", "Personal")
-        subject_keyword: Keyword to search for in email subjects
         attachment_name: Name of the attachment to save
         save_path: Full path where to save the attachment
+        subject_keyword: Keyword to search for in email subjects (substring match)
+        message_id: Exact message ID for precise matching (e.g., "<abc123@example.com>")
 
     Returns:
         Confirmation message with save location
     """
+    if not subject_keyword and not message_id:
+        return "Error: Either subject_keyword or message_id is required"
+
+    # Build the matching condition
+    if message_id:
+        escaped_id = message_id.replace('"', '\\"')
+        match_condition = f'message id of aMessage is "{escaped_id}"'
+        search_label = f"ID: {message_id}"
+    else:
+        escaped_keyword = subject_keyword.replace('"', '\\"')
+        match_condition = f'messageSubject contains "{escaped_keyword}"'
+        search_label = subject_keyword
 
     script = f'''
     tell application "Mail"
@@ -1114,8 +1148,8 @@ def save_email_attachment(
                 try
                     set messageSubject to subject of aMessage
 
-                    -- Check if subject contains keyword
-                    if messageSubject contains "{subject_keyword}" then
+                    -- Check if message matches criteria
+                    if {match_condition} then
                         set msgAttachments to mail attachments of aMessage
 
                         repeat with anAttachment in msgAttachments
@@ -1142,7 +1176,7 @@ def save_email_attachment(
 
             if not foundAttachment then
                 set outputText to "⚠ Attachment not found" & return
-                set outputText to outputText & "Email keyword: {subject_keyword}" & return
+                set outputText to outputText & "Email search: {search_label}" & return
                 set outputText to outputText & "Attachment name: {attachment_name}" & return
             end if
 
