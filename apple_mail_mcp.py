@@ -105,14 +105,20 @@ def list_inbox_emails(
         Formatted list of emails with subject, sender, date, and read status
     """
 
+    # Account filtering - wrap processing in conditional if specific account requested
+    account_filter = f'if accountName is "{account}" then' if account else ''
+    account_filter_end = 'end if' if account else ''
+    header = f'INBOX EMAILS - ACCOUNT: {account}' if account else 'INBOX EMAILS - ALL ACCOUNTS'
+
     script = f'''
     tell application "Mail"
-        set outputText to "INBOX EMAILS - ALL ACCOUNTS" & return & return
+        set outputText to "{header}" & return & return
         set totalCount to 0
         set allAccounts to every account
 
         repeat with anAccount in allAccounts
             set accountName to name of anAccount
+            {account_filter}
 
             try
                 -- Try to get inbox (handle both "INBOX" and "Inbox")
@@ -168,6 +174,7 @@ def list_inbox_emails(
                 set outputText to outputText & "⚠ Error accessing inbox for account " & accountName & return
                 set outputText to outputText & "   " & errMsg & return & return
             end try
+            {account_filter_end}
         end repeat
 
         set outputText to outputText & "========================================" & return
