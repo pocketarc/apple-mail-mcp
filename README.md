@@ -324,9 +324,10 @@ These preferences are automatically injected into every tool's description, help
 Several operations include safety limits to prevent accidental bulk actions:
 - `update_email_status`: Default max 10 updates
 - `manage_trash`: Default max 5 deletions
-- `move_email`: Default max 1 move
 
 These limits can be adjusted via function parameters when needed.
+
+Note: `move_email` requires an exact `message_id` parameter to ensure precise targeting and prevent accidental moves.
 
 ## Permissions
 

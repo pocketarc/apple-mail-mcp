@@ -672,8 +672,8 @@ filtered_search = search_emails(
     max_results=50
 )
 
-# Step 3: Process in batches
-# Use move_email or update_email_status with max_moves/max_updates
+# Step 3: Process results
+# Use move_email with message_id for each result, or update_email_status with max_updates
 ```
 
 ## Search Troubleshooting

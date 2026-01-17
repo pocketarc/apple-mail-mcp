@@ -87,7 +87,10 @@ Inbox (always empty or near-empty)
 list_mailboxes(include_counts=True)
 
 # Move to Archive after processing
-move_email(to_mailbox="Archive", subject_keyword="...", max_moves=10)
+# 1. First search to get message IDs
+search_emails(mailbox="INBOX", read_status="read", max_results=10)
+# 2. Move each by message_id
+move_email(account="Work", message_id="<id-from-search>", to_mailbox="Archive", from_mailbox="INBOX")
 
 # Find anything later with search
 search_emails(mailbox="All", subject_keyword="...")
@@ -127,8 +130,10 @@ list_mailboxes()
 #    - Create subfolders for each project
 
 # 3. Move project emails
+# First search to get message IDs
 search_emails(subject_keyword="Project Alpha", mailbox="All")
-move_email(to_mailbox="Projects/Project Alpha", subject_keyword="Project Alpha", max_moves=20)
+# Then move each by message_id
+move_email(account="Work", message_id="<id-from-search>", to_mailbox="Projects/Project Alpha", from_mailbox="INBOX")
 
 # 4. Set up routine to file new project emails
 #    (Do this during daily processing)
@@ -166,8 +171,10 @@ get_statistics(scope="account_overview")
 # 2. Create client folders in Mail app
 
 # 3. Batch move by sender
-search_emails(sender="contact@clienta.com", mailbox="All")
-move_email(to_mailbox="Clients/Client A", sender="contact@clienta.com", max_moves=50)
+# First search to get message IDs
+search_emails(sender="contact@clienta.com", mailbox="All", max_results=50)
+# Then move each email by its message_id
+move_email(account="Work", message_id="<id-from-search>", to_mailbox="Clients/Client A", from_mailbox="INBOX")
 
 # 4. Review and adjust
 list_mailboxes(include_counts=True)
@@ -275,15 +282,15 @@ list_mailboxes(include_counts=True)
 **Batch migration workflow**:
 
 ```
-# 1. Identify emails to move
-search_emails(subject_keyword="Project Alpha", mailbox="All")
+# 1. Identify emails to move (returns message IDs)
+search_emails(subject_keyword="Project Alpha", mailbox="All", max_results=50)
 
-# 2. Move in batches
+# 2. Move each email by its message_id
 move_email(
+    account="Work",
+    message_id="<id-from-search>",
     to_mailbox="Projects/Project Alpha",
-    subject_keyword="Project Alpha",
-    from_mailbox="INBOX",
-    max_moves=20
+    from_mailbox="INBOX"
 )
 
 # 3. Verify
@@ -294,16 +301,15 @@ list_mailboxes(include_counts=True)
 
 **For sender-based migration**:
 ```
-# Find all emails from a sender
+# Find all emails from a sender (returns message IDs)
 search_emails(sender="client@example.com", mailbox="All", max_results=50)
 
-# Move them
+# Move each email by its message_id
 move_email(
+    account="Work",
+    message_id="<id-from-search>",
     to_mailbox="Clients/Client Name",
-    from_mailbox="INBOX",
-    subject_keyword="",  # Empty = match all
-    sender="client@example.com",  # Use search to identify first
-    max_moves=20
+    from_mailbox="INBOX"
 )
 ```
 
@@ -320,12 +326,16 @@ move_email(
 #    - Reference emails → Reference
 #    - Everything else → Archive
 
-# 3. Quick moves using keywords
-move_email(to_mailbox="Projects/Alpha", subject_keyword="Alpha", max_moves=5)
-move_email(to_mailbox="Clients/ClientA", subject_keyword="ClientA", max_moves=5)
+# 3. Search for emails to file, then move by message_id
+search_emails(subject_keyword="Alpha", mailbox="INBOX", max_results=10)
+move_email(account="Work", message_id="<id>", to_mailbox="Projects/Alpha", from_mailbox="INBOX")
 
-# 4. Batch archive remaining
-move_email(to_mailbox="Archive", from_mailbox="INBOX", max_moves=20)
+search_emails(subject_keyword="ClientA", mailbox="INBOX", max_results=10)
+move_email(account="Work", message_id="<id>", to_mailbox="Clients/ClientA", from_mailbox="INBOX")
+
+# 4. Archive remaining read emails
+search_emails(mailbox="INBOX", read_status="read", max_results=20)
+move_email(account="Work", message_id="<id>", to_mailbox="Archive", from_mailbox="INBOX")
 ```
 
 ## Maintaining Your Structure
@@ -492,11 +502,15 @@ Projects/
 
 **Moving to nested folders**:
 ```
-# Note the "/" separator for nested paths
+# 1. Search to get message IDs
+search_emails(subject_keyword="Alpha", mailbox="INBOX", max_results=10)
+
+# 2. Move each by message_id - note the "/" separator for nested paths
 move_email(
+    account="Work",
+    message_id="<id-from-search>",
     to_mailbox="Projects/ClientA/Project Alpha",
-    subject_keyword="Alpha",
-    max_moves=10
+    from_mailbox="INBOX"
 )
 ```
 
@@ -533,12 +547,14 @@ For short-term projects (2-4 weeks):
 
 ```
 # Create temporary folder in Mail app
-# Use during project
-move_email(to_mailbox="Temp/ProjectName", ...)
+# During project, search and move by message_id
+search_emails(subject_keyword="ProjectName", mailbox="INBOX")
+move_email(account="Work", message_id="<id>", to_mailbox="Temp/ProjectName", from_mailbox="INBOX")
 
 # When project completes, bulk archive
 search_emails(mailbox="Temp/ProjectName", max_results=100)
-move_email(to_mailbox="Archive/2025/ProjectName", ...)
+# Move each by message_id to archive
+move_email(account="Work", message_id="<id>", to_mailbox="Archive/2025/ProjectName", from_mailbox="Temp/ProjectName")
 
 # Delete empty temp folder in Mail app
 ```
@@ -602,7 +618,8 @@ Archive/
 4. **Backfill key projects** only:
    ```
    search_emails(subject_keyword="ProjectName", mailbox="All", max_results=50)
-   move_email(to_mailbox="Projects/ProjectName", ...)
+   # Move each by message_id
+   move_email(account="Work", message_id="<id>", to_mailbox="Projects/ProjectName", from_mailbox="INBOX")
    ```
 5. **Leave Archive alone** - search when needed
 
@@ -611,9 +628,8 @@ Archive/
 | Task | Tool | Example |
 |------|------|---------|
 | View structure | `list_mailboxes()` | include_counts=True |
-| Move emails | `move_email()` | to_mailbox="path/to/folder" |
-| Batch move | `move_email()` | max_moves=20 |
-| Find emails | `search_emails()` | mailbox="All" |
+| Find emails | `search_emails()` | mailbox="All" (returns message IDs) |
+| Move email | `move_email()` | message_id="<id>", to_mailbox="path/to/folder" |
 | Check patterns | `get_statistics()` | scope="account_overview" |
 | Mailbox stats | `get_statistics()` | scope="mailbox_breakdown" |
 | Export folder | `export_emails()` | scope="entire_mailbox" |

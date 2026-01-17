@@ -778,38 +778,23 @@ def list_mailboxes(
 def move_email(
     account: str,
     to_mailbox: str,
-    subject_keyword: Optional[str] = None,
-    message_id: Optional[str] = None,
+    message_id: str,
     from_mailbox: str = "INBOX",
-    max_moves: int = 1
 ) -> str:
     """
-    Move email(s) from one mailbox to another.
-
-    Specify either subject_keyword OR message_id to find the email(s).
-    message_id provides exact matching (use the ID from list_inbox_emails, search_emails, etc.)
+    Move an email from one mailbox to another.
 
     Args:
         account: Account name (e.g., "Gmail", "Work")
         to_mailbox: Destination mailbox name. For nested mailboxes, use "/" separator (e.g., "Projects/Amplify Impact")
-        subject_keyword: Keyword to search for in email subjects (substring match)
-        message_id: Exact message ID for precise matching (e.g., "<abc123@example.com>")
+        message_id: Exact message ID for precise matching (e.g., "<abc123@example.com>"). Get this from list_inbox_emails, search_emails, etc.
         from_mailbox: Source mailbox name (default: "INBOX")
-        max_moves: Maximum number of emails to move (default: 1, safety limit)
 
     Returns:
-        Confirmation message with details of moved emails
+        Confirmation message with details of moved email
     """
-    if not subject_keyword and not message_id:
-        return "Error: Either subject_keyword or message_id is required"
-
-    # Build the matching condition
-    if message_id:
-        escaped_id = message_id.replace('"', '\\"')
-        match_condition = f'message id of aMessage is "{escaped_id}"'
-    else:
-        escaped_keyword = subject_keyword.replace('"', '\\"')
-        match_condition = f'messageSubject contains "{escaped_keyword}"'
+    escaped_id = message_id.replace('"', '\\"')
+    match_condition = f'message id of aMessage is "{escaped_id}"'
 
     # Parse nested mailbox path
     mailbox_parts = to_mailbox.split('/')
@@ -827,8 +812,8 @@ def move_email(
 
     script = f'''
     tell application "Mail"
-        set outputText to "MOVING EMAILS" & return & return
-        set movedCount to 0
+        set outputText to "MOVING EMAIL" & return & return
+        set foundEmail to false
 
         try
             set targetAccount to account "{account}"
@@ -848,13 +833,12 @@ def move_email(
             set sourceMessages to every message of sourceMailbox
 
             repeat with aMessage in sourceMessages
-                if movedCount >= {max_moves} then exit repeat
+                if foundEmail then exit repeat
 
                 try
-                    set messageSubject to subject of aMessage
-
-                    -- Check if message matches criteria
+                    -- Check if message matches by message_id
                     if {match_condition} then
+                        set messageSubject to subject of aMessage
                         set messageSender to sender of aMessage
                         set messageDate to date received of aMessage
 
@@ -864,16 +848,16 @@ def move_email(
                         set outputText to outputText & "✓ Moved: " & messageSubject & return
                         set outputText to outputText & "  From: " & messageSender & return
                         set outputText to outputText & "  Date: " & (messageDate as string) & return
-                        set outputText to outputText & "  {from_mailbox} → {to_mailbox}" & return & return
+                        set outputText to outputText & "  {from_mailbox} → {to_mailbox}" & return
 
-                        set movedCount to movedCount + 1
+                        set foundEmail to true
                     end if
                 end try
             end repeat
 
-            set outputText to outputText & "========================================" & return
-            set outputText to outputText & "TOTAL MOVED: " & movedCount & " email(s)" & return
-            set outputText to outputText & "========================================" & return
+            if not foundEmail then
+                set outputText to outputText & "No email found with the specified message_id in {from_mailbox}" & return
+            end if
 
         on error errMsg
             return "Error: " & errMsg & return & "Please check that account and mailbox names are correct. For nested mailboxes, use '/' separator (e.g., 'Projects/Amplify Impact')."

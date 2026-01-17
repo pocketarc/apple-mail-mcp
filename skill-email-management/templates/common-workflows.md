@@ -38,7 +38,10 @@ get_recent_emails(count=20, include_content=False)
 update_email_status(action="mark_read", sender="automated@", mailbox="INBOX", max_updates=10)
 
 # 4. Archive processed emails
-move_email(to_mailbox="Archive", from_mailbox="INBOX", max_moves=20)
+# First search for emails to archive
+search_emails(mailbox="INBOX", read_status="read", max_results=20)
+# Then move each by message_id
+move_email(account="Work", message_id="<id-from-search>", to_mailbox="Archive", from_mailbox="INBOX")
 
 # 5. Review flagged items for tomorrow
 search_emails(mailbox="All")  # Check flags
@@ -168,7 +171,7 @@ save_email_attachment(
 ### Daily Filing Routine
 
 ```
-# 1. File project emails
+# 1. File project emails - search first to get message IDs
 search_emails(
     account="Work",
     subject_keyword="Project Alpha",
@@ -176,36 +179,43 @@ search_emails(
     read_status="all"
 )
 
+# Move each email by its message_id (repeat for each result)
 move_email(
     account="Work",
-    subject_keyword="Project Alpha",
+    message_id="<id-from-search>",
     to_mailbox="Projects/Alpha",
-    from_mailbox="INBOX",
-    max_moves=10
+    from_mailbox="INBOX"
 )
 
-# 2. File client emails
+# 2. File client emails - search by sender to get IDs
 search_emails(
     account="Work",
     sender="client@example.com",
     mailbox="INBOX"
 )
 
+# Move each by message_id
 move_email(
     account="Work",
-    sender="client@example.com",  # Need to use subject_keyword with search result
+    message_id="<id-from-search>",
     to_mailbox="Clients/ClientName",
-    from_mailbox="INBOX",
-    max_moves=10
+    from_mailbox="INBOX"
 )
 
-# 3. Archive everything else
+# 3. Archive everything else - search for read emails
+search_emails(
+    account="Work",
+    mailbox="INBOX",
+    read_status="read",
+    max_results=20
+)
+
+# Move each by message_id
 move_email(
     account="Work",
-    subject_keyword="",  # Match all
+    message_id="<id-from-search>",
     to_mailbox="Archive",
-    from_mailbox="INBOX",
-    max_moves=20
+    from_mailbox="INBOX"
 )
 ```
 
@@ -223,7 +233,7 @@ get_statistics(
 )
 
 # 3. Batch move by pattern
-# Example: Move all emails from a client
+# Example: Move all emails from a client - search first to get IDs
 search_emails(
     account="Work",
     sender="bigclient@example.com",
@@ -231,13 +241,12 @@ search_emails(
     max_results=50
 )
 
-# Then move them (repeat with batches if >10)
+# Then move each by message_id (repeat for each search result)
 move_email(
     account="Work",
-    subject_keyword="[pattern from search]",
+    message_id="<id-from-search>",
     to_mailbox="Clients/BigClient",
-    from_mailbox="INBOX",
-    max_moves=10
+    from_mailbox="INBOX"
 )
 ```
 
@@ -266,13 +275,12 @@ export_emails(
     format="txt"
 )
 
-# 4. Move to archive
+# 4. Move to archive (for each email found in step 1)
 move_email(
     account="Work",
-    subject_keyword="[pattern]",
+    message_id="<id-from-search>",
     to_mailbox="Archive/2024",
-    from_mailbox="INBOX",
-    max_moves=20
+    from_mailbox="INBOX"
 )
 ```
 
@@ -297,13 +305,12 @@ reply_to_email(
     reply_to_all=False
 )
 
-# 3. Archive the thread
+# 3. Archive the thread (use message_id from step 1)
 move_email(
     account="Work",
-    subject_keyword="Quick Question",
+    message_id="<id-from-search>",
     to_mailbox="Archive",
-    from_mailbox="INBOX",
-    max_moves=1
+    from_mailbox="INBOX"
 )
 ```
 
@@ -386,12 +393,12 @@ update_email_status(
     max_updates=1
 )
 
+# Use message_id from step 1
 move_email(
     account="Work",
-    subject_keyword="Customer Issue",
+    message_id="<id-from-search>",
     to_mailbox="Waiting For",
-    from_mailbox="INBOX",
-    max_moves=1
+    from_mailbox="INBOX"
 )
 ```
 
@@ -462,13 +469,12 @@ export_emails(
     format="txt"
 )
 
-# 3. Move to archive or delete
+# 3. Move to archive or delete (use message_id from step 1)
 move_email(
     account="Work",
-    subject_keyword="[pattern]",
+    message_id="<id-from-search>",
     to_mailbox="Archive/2024",
-    from_mailbox="INBOX",
-    max_moves=20
+    from_mailbox="INBOX"
 )
 ```
 
@@ -601,7 +607,7 @@ get_statistics(
 #    Option B: Move to dedicated folder
 #    Option C: Unsubscribe
 
-# 3. Organize existing emails
+# 3. Organize existing emails - search to get IDs
 search_emails(
     account="Work",
     sender="automated-reports@company.com",
@@ -609,12 +615,12 @@ search_emails(
     max_results=50
 )
 
+# Move each by message_id
 move_email(
     account="Work",
-    subject_keyword="[pattern]",
+    message_id="<id-from-search>",
     to_mailbox="Automated Reports",
-    from_mailbox="INBOX",
-    max_moves=20
+    from_mailbox="INBOX"
 )
 ```
 
@@ -666,7 +672,7 @@ update_email_status(
 ### Bulk Move by Sender
 
 ```
-# 1. Find all emails from sender
+# 1. Find all emails from sender (returns message IDs)
 search_emails(
     account="Work",
     sender="project-team@company.com",
@@ -674,17 +680,14 @@ search_emails(
     max_results=50
 )
 
-# 2. Move in batches (max_moves=10 is safe)
+# 2. Move each email by its message_id
+# Repeat this for each message_id from search results
 move_email(
     account="Work",
-    subject_keyword="",  # Use pattern from search
+    message_id="<id-from-search>",
     to_mailbox="Projects/Team Project",
-    from_mailbox="INBOX",
-    max_moves=10
+    from_mailbox="INBOX"
 )
-
-# 3. Repeat if more than 10 emails
-# (Run the move_email command again)
 ```
 
 ## Backup and Export Workflows
@@ -780,7 +783,10 @@ search_emails(mailbox="All")  # Review flags
 update_email_status(action="unflag", ...)  # Clear completed
 
 # 3. Archive week's emails
-move_email(to_mailbox="Archive", from_mailbox="INBOX", max_moves=50)
+# First search for read emails to archive
+search_emails(account="Work", mailbox="INBOX", read_status="read", max_results=50)
+# Then move each by message_id
+move_email(account="Work", message_id="<id-from-search>", to_mailbox="Archive", from_mailbox="INBOX")
 
 # 4. Review statistics
 get_statistics(scope="account_overview", days_back=7)
@@ -793,10 +799,11 @@ get_statistics(scope="account_overview", days_back=7)
 
 1. **Copy and adapt**: These are templates - adjust parameters for your needs
 2. **Chain commands**: Run multiple commands in sequence for complex workflows
-3. **Use max limits**: Always respect max_moves, max_deletes safety limits
-4. **Review before deleting**: Always search first, then delete
-5. **Export before cleanup**: Backup important emails before bulk operations
-6. **Start small**: Test with small max values (5-10) before increasing
+3. **Search then move**: Always use `search_emails` first to get message IDs, then `move_email` with exact IDs
+4. **Use max limits**: Always respect max_deletes safety limits for trash operations
+5. **Review before deleting**: Always search first, then delete
+6. **Export before cleanup**: Backup important emails before bulk operations
+7. **Start small**: Test with small max values (5-10) before increasing
 
 ## Quick Reference: Most Common Commands
 
@@ -804,9 +811,9 @@ get_statistics(scope="account_overview", days_back=7)
 # Daily essentials
 get_inbox_overview()
 get_recent_emails(count=20)
-search_emails(subject_keyword="...", mailbox="All")
+search_emails(subject_keyword="...", mailbox="All")  # Returns message IDs
 reply_to_email(subject_keyword="...", reply_body="...")
-move_email(to_mailbox="Archive", from_mailbox="INBOX", max_moves=10)
+move_email(account="...", message_id="<id>", to_mailbox="Archive", from_mailbox="INBOX")
 
 # Weekly maintenance
 list_mailboxes(include_counts=True)

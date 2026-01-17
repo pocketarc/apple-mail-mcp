@@ -164,7 +164,8 @@ Based on your inbox state, the skill provides relevant advice:
 
 ### Safety First
 The skill enforces safety practices:
-- Always respects max_moves/max_deletes limits
+- Uses message_id for precise email moves (prevents accidental moves)
+- Always respects max_deletes limits for trash operations
 - Suggests exporting before bulk deletion
 - Confirms destructive operations
 - Provides reversible alternatives (trash vs. permanent delete)

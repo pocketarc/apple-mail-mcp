@@ -104,7 +104,7 @@ For each email, apply the 5 D's:
 1. **Quick Scan**: Subject and sender
 2. **Decision**: Which of the 5 actions?
 3. **Execute**: Use appropriate tool
-4. **Archive or File**: `move_email(to_mailbox="Archive")` or specific folder
+4. **Archive or File**: Use `search_emails()` to get ID, then `move_email(message_id="<id>", to_mailbox="Archive")`
 
 **Step 4: Review Flagged Items**
 ```
@@ -276,7 +276,7 @@ Track these to measure success:
 | Quick reply | `reply_to_email(reply_body="...", subject_keyword="...")` |
 | Create draft | `manage_drafts(action="create", ...)` |
 | Move to trash | `manage_trash(action="move_to_trash", ...)` |
-| Archive | `move_email(to_mailbox="Archive", ...)` |
+| Archive | `move_email(message_id="<id>", to_mailbox="Archive")` |
 | Flag for later | `update_email_status(action="flag", ...)` |
 | List drafts | `manage_drafts(action="list")` |
 | Search all | `search_emails(mailbox="All", ...)` |

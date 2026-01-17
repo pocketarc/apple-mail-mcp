@@ -5,6 +5,19 @@ All notable changes to the Apple Mail MCP Server will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-01-17
+
+### Changed
+- **BREAKING**: `move_email` now requires `message_id` parameter for precise email targeting
+  - Removed `subject_keyword` parameter (use `search_emails` to find emails first)
+  - Removed `max_moves` parameter (only one email is moved per call)
+  - This prevents accidental moves of wrong emails when multiple match a subject keyword
+
+### Migration Guide
+If you were using `move_email(subject_keyword="...")`:
+1. First call `search_emails(subject_keyword="...")` to find matching emails
+2. Then call `move_email(message_id="<id>")` for each email you want to move
+
 ## [1.4.0] - 2025-10-14
 
 ### Added
@@ -140,12 +153,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History Summary
 
+- **v1.5.0** - BREAKING: `move_email` now requires `message_id` for precise targeting
+- **v1.4.0** - User preferences configuration
 - **v1.3.0** - Major feature expansion (8 new tools: search, status, trash, forward, threads, drafts, statistics, export)
 - **v1.2.0** - Enhanced overview with email preview
 - **v1.1.0** - Added inbox overview dashboard
 - **v1.0.0** - Initial release with core functionality
 
 ## Upgrade Notes
+
+### Upgrading to 1.5.0
+- **BREAKING CHANGE**: `move_email` no longer accepts `subject_keyword` or `max_moves`
+- Must use `message_id` parameter (get IDs from `list_inbox_emails` or `search_emails`)
+- Update any automation scripts that used subject_keyword matching
+- Rebuild .mcpb bundle to include the updated tool signature
 
 ### Upgrading to 1.3.0
 - No breaking changes
