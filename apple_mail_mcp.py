@@ -7,6 +7,8 @@ Provides tools to query and interact with Apple Mail inboxes
 import subprocess
 import json
 import os
+import email
+from email.policy import default as email_policy
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from mcp.server.fastmcp import FastMCP
@@ -42,6 +44,83 @@ def run_applescript(script: str) -> str:
         raise Exception("AppleScript execution timed out")
     except Exception as e:
         raise Exception(f"AppleScript execution failed: {str(e)}")
+
+
+def _strip_attachment_content(source: str) -> str:
+    """
+    Replace binary attachment content with descriptive placeholders.
+
+    Parses the RFC 822 email source and replaces the payload of binary
+    attachments and inline images with placeholders like:
+    [Attachment #1: image.png (image/png, 45.2 KB)]
+    """
+    try:
+        msg = email.message_from_string(source, policy=email_policy)
+    except Exception:
+        return source
+
+    attachment_num = 0
+
+    def should_strip(part):
+        """Determine if a MIME part's content should be stripped."""
+        content_type = part.get_content_type()
+        maintype = content_type.split('/')[0]
+        disposition = part.get_content_disposition()
+
+        # Always preserve text/plain and text/html bodies
+        if content_type in ('text/plain', 'text/html'):
+            return False
+
+        # Strip if it's an attachment or inline
+        if disposition in ('attachment', 'inline'):
+            return True
+
+        # Strip binary content types
+        if maintype in ('image', 'audio', 'video', 'application'):
+            return True
+
+        return False
+
+    def process_part(part):
+        """Process a single MIME part, stripping if necessary."""
+        nonlocal attachment_num
+
+        if part.is_multipart():
+            return
+
+        if should_strip(part):
+            attachment_num += 1
+
+            filename = part.get_filename() or "unnamed"
+            content_type = part.get_content_type()
+
+            # Calculate original size from payload
+            try:
+                payload = part.get_payload(decode=True)
+                if payload:
+                    size_bytes = len(payload)
+                    if size_bytes >= 1024 * 1024:
+                        size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+                    elif size_bytes >= 1024:
+                        size_str = f"{size_bytes / 1024:.1f} KB"
+                    else:
+                        size_str = f"{size_bytes} bytes"
+                else:
+                    size_str = "unknown size"
+            except Exception:
+                size_str = "unknown size"
+
+            placeholder = f"[Attachment #{attachment_num}: {filename} ({content_type}, {size_str})]"
+            part.set_payload(placeholder)
+
+            # Remove Content-Transfer-Encoding since it's now plain text
+            if 'Content-Transfer-Encoding' in part:
+                del part['Content-Transfer-Encoding']
+
+    for part in msg.walk():
+        process_part(part)
+
+    return msg.as_string()
 
 
 def parse_email_list(output: str) -> List[Dict[str, Any]]:
@@ -303,6 +382,24 @@ def get_email_with_content(
                                 set outputText to outputText & "   Content: [Not available]" & return
                             end try
 
+                            -- Get attachments
+                            set msgAttachments to mail attachments of aMessage
+                            set attachmentCount to count of msgAttachments
+
+                            if attachmentCount > 0 then
+                                set outputText to outputText & "   Attachments (" & attachmentCount & "):" & return
+                                repeat with anAttachment in msgAttachments
+                                    set attachmentName to name of anAttachment
+                                    try
+                                        set attachmentSize to size of anAttachment
+                                        set sizeInKB to (attachmentSize / 1024) as integer
+                                        set outputText to outputText & "      📎 " & attachmentName & " (" & sizeInKB & " KB)" & return
+                                    on error
+                                        set outputText to outputText & "      📎 " & attachmentName & return
+                                    end try
+                                end repeat
+                            end if
+
                             set outputText to outputText & return
                             set resultCount to resultCount + 1
                         end if
@@ -334,16 +431,16 @@ def get_email_source(
     mailbox: str = "INBOX"
 ) -> str:
     """
-    Get the raw RFC 822 source of an email including all headers and MIME parts.
+    Get the RFC 822 source of an email including all headers and MIME parts.
 
     Specify either subject_keyword OR message_id to find the email.
     message_id is more precise (use the ID returned by list_inbox_emails, search_emails, etc.)
 
-    Returns the complete email source with:
+    Returns the email source with:
     - All headers (Return-Path, Received, MIME-Version, etc.)
     - MIME structure with boundaries
     - text/plain and text/html parts
-    - Attachment metadata (binary data may be truncated)
+    - Binary attachments replaced with placeholders like [Attachment #1: file.png (image/png, 45.2 KB)]
 
     Useful for:
     - Accessing HTML content
@@ -404,7 +501,9 @@ def get_email_source(
     '''
 
     result = run_applescript(script)
-    return result
+    if result.startswith("Error:"):
+        return result
+    return _strip_attachment_content(result)
 
 
 @mcp.tool()
