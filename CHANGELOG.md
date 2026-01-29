@@ -5,6 +5,32 @@ All notable changes to the Apple Mail MCP Server will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2025-01-28
+
+### Changed
+- **BREAKING**: `get_email_with_content` now requires `message_id` parameter for precise email targeting
+  - Removed `subject_keyword` parameter (use `search_emails` to find emails first)
+  - Removed `max_results` parameter (returns single email)
+  - Use message IDs from `list_inbox_emails`, `search_emails`, etc.
+
+### Added
+- `get_email_source`: New function to get raw RFC 822 email source
+  - Access full headers (Return-Path, Received, MIME-Version, etc.)
+  - View MIME structure with boundaries
+  - Binary attachments replaced with descriptive placeholders
+  - Useful for HTML content, debugging, and email forensics
+- `message_id` parameter added to `list_email_attachments` and `save_email_attachment`
+  - Allows precise email targeting (recommended over subject_keyword)
+- RFC 2822 Message-ID header now included in all email list outputs
+
+### Fixed
+- Account filter now correctly applied in `list_inbox_emails`
+
+### Migration Guide
+If you were using `get_email_with_content(subject_keyword="...")`:
+1. First call `search_emails(subject_keyword="...")` to find matching emails
+2. Then call `get_email_with_content(message_id="<id>")` to get full content
+
 ## [1.5.0] - 2025-01-17
 
 ### Changed

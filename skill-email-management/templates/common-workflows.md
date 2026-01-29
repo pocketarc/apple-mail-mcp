@@ -53,11 +53,11 @@ search_emails(mailbox="All")  # Check flags
 
 ```
 # Option 1: Search by subject
-get_email_with_content(
+search_emails(
     account="Work",
     subject_keyword="Project Alpha",
-    max_results=5,
-    max_content_length=300
+    include_content=True,
+    max_results=5
 )
 
 # Option 2: Get full thread
@@ -66,6 +66,13 @@ get_email_thread(
     subject_keyword="Project Alpha",
     mailbox="All",
     max_messages=20
+)
+
+# Option 3: Get full content of specific email (use message_id from search)
+get_email_with_content(
+    account="Work",
+    message_id="<id-from-search>",
+    max_content_length=0  # 0 = unlimited
 )
 
 # Option 3: Advanced search
@@ -150,17 +157,16 @@ search_emails(
     max_results=20
 )
 
-# Then list attachments
+# Then list attachments (use message_id from search results)
 list_email_attachments(
     account="Work",
-    subject_keyword="Invoice",
-    max_results=1
+    message_id="<id-from-search>"
 )
 
 # Save specific attachment
 save_email_attachment(
     account="Work",
-    subject_keyword="Invoice",
+    message_id="<id-from-search>",
     attachment_name="invoice.pdf",
     save_path="~/Desktop/invoice.pdf"
 )
@@ -290,11 +296,11 @@ move_email(
 
 ```
 # 1. Find the email
-get_email_with_content(
+search_emails(
     account="Work",
     subject_keyword="Quick Question",
-    max_results=1,
-    max_content_length=300
+    include_content=True,
+    max_results=1
 )
 
 # 2. Reply immediately
@@ -317,12 +323,12 @@ move_email(
 ### Deferred Response (Draft)
 
 ```
-# 1. Review email content
-get_email_with_content(
+# 1. Find and review email content
+search_emails(
     account="Work",
     subject_keyword="Complex Request",
-    max_results=1,
-    max_content_length=500
+    include_content=True,
+    max_results=1
 )
 
 # 2. Create draft for later
@@ -368,11 +374,11 @@ reply_to_email(
 
 ```
 # 1. Find the email
-get_email_with_content(
+search_emails(
     account="Work",
     subject_keyword="Customer Issue",
-    max_results=1,
-    max_content_length=500
+    include_content=True,
+    max_results=1
 )
 
 # 2. Forward to colleague
@@ -719,22 +725,29 @@ export_emails(
 
 ```
 # 1. Find the email
-get_email_with_content(
+search_emails(
     account="Work",
     subject_keyword="Contract Agreement",
-    max_results=1,
-    max_content_length=0  # Full content
+    include_content=True,
+    max_results=1
 )
 
-# 2. Export with attachments
+# 2. Get full content (use message_id from step 1)
+get_email_with_content(
+    account="Work",
+    message_id="<id-from-search>",
+    max_content_length=0  # 0 = unlimited
+)
+
+# 3. List attachments (use message_id from step 1)
 list_email_attachments(
     account="Work",
-    subject_keyword="Contract Agreement"
+    message_id="<id-from-search>"
 )
 
 save_email_attachment(
     account="Work",
-    subject_keyword="Contract Agreement",
+    message_id="<id-from-search>",
     attachment_name="contract.pdf",
     save_path="~/Documents/Contracts/contract.pdf"
 )

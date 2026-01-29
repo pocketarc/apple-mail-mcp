@@ -74,7 +74,7 @@ The Apple Mail MCP provides comprehensive email management capabilities:
 **Goal**: Quickly locate emails and take action
 
 **Search Strategies**:
-- **By Subject**: `get_email_with_content(subject_keyword="keyword")`
+- **By Message ID**: `get_email_with_content(message_id="<id>")` - Get full content of specific email
 - **By Sender**: `search_emails(sender="name@example.com")`
 - **By Date Range**: `search_emails(date_from="2025-01-01", date_to="2025-01-31")`
 - **With Attachments**: `search_emails(has_attachments=True)`
@@ -83,7 +83,7 @@ The Apple Mail MCP provides comprehensive email management capabilities:
 
 **Action Patterns**:
 - View thread context: `get_email_thread(subject_keyword="keyword")`
-- Download attachments: `list_email_attachments()` → `save_email_attachment()`
+- Download attachments: `list_email_attachments(message_id)` → `save_email_attachment(message_id)`
 - Forward with context: `forward_email(message="FYI - see below")`
 
 ### 4. Achieving Inbox Zero
@@ -203,7 +203,8 @@ The Apple Mail MCP provides comprehensive email management capabilities:
 | Goal | Primary Tool | Alternative |
 |------|-------------|-------------|
 | Get overview | `get_inbox_overview` | - |
-| Find specific email | `get_email_with_content` | `search_emails` |
+| Find specific email | `search_emails` | `list_inbox_emails` |
+| Get email content | `get_email_with_content(message_id)` | `search_emails(include_content)` |
 | Advanced search | `search_emails` | - |
 | View conversation | `get_email_thread` | `search_emails(subject_keyword)` |
 | Recent emails | `get_recent_emails` | `list_inbox_emails` |
@@ -255,11 +256,12 @@ The Apple Mail MCP provides comprehensive email management capabilities:
 6. Work toward inbox zero gradually (not all at once)
 
 ### "I can't find an important email"
-1. Try `get_email_with_content(subject_keyword)` first
-2. If not found, use `search_emails(mailbox="All", subject_keyword="..."))`
+1. Try `search_emails(subject_keyword="...")` first
+2. Expand search: `search_emails(mailbox="All", subject_keyword="...")`
 3. Try searching by sender: `search_emails(sender="...")`
 4. Try date range: `search_emails(date_from="...", date_to="...")`
 5. Check if it's in trash or other folders
+6. Once found, get full content: `get_email_with_content(message_id="<id>")`
 
 ### "I need to organize emails by project"
 1. Review current structure: `list_mailboxes()`

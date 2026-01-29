@@ -255,7 +255,7 @@ The MCP server provides 20 tools:
 |------|-------------|
 | `get_inbox_overview` | Comprehensive dashboard with unread counts, folders, and recent emails |
 | `list_inbox_emails` | List emails from inbox with filtering options |
-| `get_email_with_content` | Search emails with full content preview |
+| `get_email_with_content` | Get specific email by message ID with full content |
 | `search_emails` | Advanced search with multiple criteria |
 | `get_unread_count` | Quick unread count per account |
 | `list_accounts` | List all configured Mail accounts |

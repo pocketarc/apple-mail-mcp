@@ -1,7 +1,7 @@
 {
   "dxt_version": "0.1",
   "name": "Apple Mail MCP",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Natural language interface for Apple Mail with Email Management Expert Skill - comprehensive email management including advanced search, intelligent workflows, productivity strategies, status updates, thread views, draft management, statistics, and export capabilities",
   "author": {
     "name": "Patrick Freyer"
@@ -46,7 +46,7 @@
     },
     {
       "name": "get_email_with_content",
-      "description": "Search for emails by subject keyword and return with full content preview. Search within specific account with configurable content length."
+      "description": "Get a specific email by message ID with full content. Use message IDs from list_inbox_emails, search_emails, etc. Configurable content length."
     },
     {
       "name": "get_unread_count",
@@ -66,7 +66,7 @@
     },
     {
       "name": "move_email",
-      "description": "Move emails between mailboxes by searching for subject keywords. Supports nested mailboxes with path notation (e.g., 'Projects/Amplify Impact'). Includes safety limit on number of moves."
+      "description": "Move an email between mailboxes by message ID. Supports nested mailboxes with path notation (e.g., 'Projects/Amplify Impact'). Get message IDs from list_inbox_emails, search_emails, etc."
     },
     {
       "name": "reply_to_email",
@@ -78,11 +78,11 @@
     },
     {
       "name": "list_email_attachments",
-      "description": "List attachments for emails matching a subject keyword. Shows attachment names and sizes."
+      "description": "List attachments for an email by message ID (recommended) or subject keyword. Shows attachment names and sizes."
     },
     {
       "name": "save_email_attachment",
-      "description": "Save a specific attachment from an email to disk. Search by subject keyword and attachment name."
+      "description": "Save a specific attachment from an email to disk. Find email by message ID (recommended) or subject keyword."
     },
     {
       "name": "search_emails",

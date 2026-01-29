@@ -73,8 +73,12 @@ For every email in your inbox, choose ONE action:
 
 **For downloads**:
 ```
-list_email_attachments(subject_keyword="...")
-save_email_attachment(attachment_name="...", save_path="...")
+# First find the email to get message_id
+search_emails(subject_keyword="...", has_attachments=True)
+
+# Then list and save attachments using message_id
+list_email_attachments(message_id="<id-from-search>")
+save_email_attachment(message_id="<id-from-search>", attachment_name="...", save_path="...")
 ```
 
 ## Complete Inbox Zero Workflow

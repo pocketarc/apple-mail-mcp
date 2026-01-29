@@ -4,23 +4,30 @@ This document provides a comprehensive reference for search patterns using the A
 
 ## Basic Search Tools
 
-The MCP provides three main search tools:
+The MCP provides these search and retrieval tools:
 
-1. **`get_email_with_content()`** - Best for quick subject searches with content preview
-2. **`search_emails()`** - Best for advanced filtering with multiple criteria
-3. **`get_email_thread()`** - Best for viewing conversation threads
+1. **`search_emails()`** - Best for finding emails with multiple criteria (subject, sender, date, etc.)
+2. **`get_email_thread()`** - Best for viewing conversation threads
+3. **`get_email_with_content(message_id)`** - Get full content of a specific email by ID
 
 ## Search Pattern Cheat Sheet
 
 ### By Subject
 
 ```python
-# Simple subject search (fast, with content)
-get_email_with_content(
+# Subject search with content preview
+search_emails(
     account="Work",
     subject_keyword="meeting",
-    max_results=5,
-    max_content_length=300
+    include_content=True,
+    max_results=5
+)
+
+# Get full content of specific email (use message_id from search results)
+get_email_with_content(
+    account="Work",
+    message_id="<abc123@example.com>",
+    max_content_length=0  # 0 = unlimited
 )
 
 # Advanced subject search (more filtering options)
@@ -237,20 +244,18 @@ search_emails(
     max_results=5
 )
 
-# Full content preview
+# Full content of specific email (use message_id from search results)
 get_email_with_content(
     account="Work",
-    subject_keyword="contract",
-    max_content_length=0,  # 0 = unlimited
-    max_results=1
+    message_id="<abc123@example.com>",
+    max_content_length=0  # 0 = unlimited
 )
 
-# Long preview (1000 chars)
+# Limited content preview (1000 chars)
 get_email_with_content(
     account="Work",
-    subject_keyword="requirements",
-    max_content_length=1000,
-    max_results=3
+    message_id="<abc123@example.com>",
+    max_content_length=1000
 )
 ```
 
@@ -300,15 +305,15 @@ search_emails(
     date_from="2025-01-01"
 )
 
-# Then list and download
+# Then list and download (use message_id from search results)
 list_email_attachments(
     account="Work",
-    subject_keyword="invoice"
+    message_id="<id-from-search>"
 )
 
 save_email_attachment(
     account="Work",
-    subject_keyword="invoice",
+    message_id="<id-from-search>",
     attachment_name="invoice.pdf",
     save_path="~/Desktop/invoice.pdf"
 )
@@ -758,7 +763,7 @@ filtered_search = search_emails(
 
 | I Want To... | Use This |
 |-------------|----------|
-| Quick subject search | `get_email_with_content(subject_keyword="...")` |
+| Search by subject | `search_emails(subject_keyword="...")` |
 | Advanced filtering | `search_emails(...)` |
 | View conversation | `get_email_thread(subject_keyword="...")` |
 | Find by sender | `search_emails(sender="...")` |
@@ -766,7 +771,7 @@ filtered_search = search_emails(
 | Find unread | `search_emails(read_status="unread")` |
 | Find with attachments | `search_emails(has_attachments=True)` |
 | Search all folders | `search_emails(mailbox="All")` |
-| Get content preview | `search_emails(include_content=True)` or `get_email_with_content()` |
+| Get full email content | `get_email_with_content(message_id="<id>")` |
 | Find sent emails | `search_emails(mailbox="Sent")` |
 | Find drafts | `manage_drafts(action="list")` |
 

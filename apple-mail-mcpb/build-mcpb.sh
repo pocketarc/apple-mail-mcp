@@ -139,9 +139,9 @@ List all emails from your inbox:
 - Filter read/unread status
 
 ### `get_email_with_content`
-Search for emails with content preview:
-- Search by subject keyword
-- Specify account to search
+Get a specific email by message ID with full content:
+- Uses message ID for precise targeting
+- Get IDs from list_inbox_emails, search_emails, etc.
 - Configurable content length
 - Returns full email details
 
@@ -153,9 +153,9 @@ View folder structure:
 
 ### `move_email`
 Organize your inbox:
-- Move emails by subject keyword
+- Move email by message ID for precise targeting
+- Get IDs from list_inbox_emails, search_emails, etc.
 - Supports nested mailboxes with "/" separator
-- Safety limit on number of moves
 - Example: Move to "Projects/Amplify Impact"
 
 ### `reply_to_email`
@@ -174,13 +174,13 @@ Send new emails:
 
 ### `list_email_attachments`
 View attachments:
-- Search by subject keyword
+- Find by message ID (recommended) or subject keyword
 - Shows attachment names and sizes
-- List for multiple matching emails
+- Get IDs from list_inbox_emails, search_emails, etc.
 
 ### `save_email_attachment`
 Download attachments:
-- Search by subject keyword
+- Find by message ID (recommended) or subject keyword
 - Specify attachment name
 - Save to custom path
 

@@ -272,23 +272,21 @@ def list_inbox_emails(
 @inject_preferences
 def get_email_with_content(
     account: str,
-    subject_keyword: str,
-    max_results: int = 5,
+    message_id: str,
     max_content_length: int = 300,
     mailbox: str = "INBOX"
 ) -> str:
     """
-    Search for emails by subject keyword and return with full content preview.
+    Get a specific email by message ID with full content.
 
     Args:
-        account: Account name to search in (e.g., "Gmail", "Work")
-        subject_keyword: Keyword to search for in email subjects
-        max_results: Maximum number of matching emails to return (default: 5)
+        account: Account name (e.g., "Gmail", "Work")
+        message_id: Exact message ID (e.g., "<abc123@example.com>"). Get this from list_inbox_emails, search_emails, etc.
         max_content_length: Maximum content length in characters (default: 300, 0 = unlimited)
         mailbox: Mailbox to search (default: "INBOX", use "All" for all mailboxes)
 
     Returns:
-        Detailed email information including content preview
+        Detailed email information including content
     """
 
     # Build mailbox selection logic
@@ -297,7 +295,6 @@ def get_email_with_content(
             set allMailboxes to every mailbox of targetAccount
             set searchMailboxes to allMailboxes
         '''
-        search_location = "all mailboxes"
     else:
         mailbox_script = f'''
             try
@@ -311,43 +308,33 @@ def get_email_with_content(
             end try
             set searchMailboxes to {{searchMailbox}}
         '''
-        search_location = mailbox
+
+    escaped_id = message_id.replace('"', '\\"')
 
     script = f'''
-    on lowercase(str)
-        set lowerStr to do shell script "echo " & quoted form of str & " | tr '[:upper:]' '[:lower:]'"
-        return lowerStr
-    end lowercase
-
     tell application "Mail"
-        set outputText to "SEARCH RESULTS FOR: {subject_keyword}" & return
-        set outputText to outputText & "Searching in: {search_location}" & return & return
-        set resultCount to 0
+        set outputText to ""
+        set foundEmail to false
 
         try
             set targetAccount to account "{account}"
             {mailbox_script}
 
             repeat with currentMailbox in searchMailboxes
+                if foundEmail then exit repeat
                 set mailboxMessages to every message of currentMailbox
                 set mailboxName to name of currentMailbox
 
                 repeat with aMessage in mailboxMessages
-                    if resultCount >= {max_results} then exit repeat
+                    if foundEmail then exit repeat
 
                     try
-                        set messageSubject to subject of aMessage
-
-                        -- Convert to lowercase for case-insensitive matching
-                        set lowerSubject to my lowercase(messageSubject)
-                        set lowerKeyword to my lowercase("{subject_keyword}")
-
-                        -- Check if subject contains keyword (case insensitive)
-                        if lowerSubject contains lowerKeyword then
+                        if message id of aMessage is "{escaped_id}" then
+                            set messageSubject to subject of aMessage
                             set messageSender to sender of aMessage
                             set messageDate to date received of aMessage
                             set messageRead to read status of aMessage
-                            set messageId to message id of aMessage
+                            set msgId to message id of aMessage
 
                             if messageRead then
                                 set readIndicator to "✓"
@@ -356,12 +343,12 @@ def get_email_with_content(
                             end if
 
                             set outputText to outputText & readIndicator & " " & messageSubject & return
-                            set outputText to outputText & "   ID: " & messageId & return
+                            set outputText to outputText & "   ID: " & msgId & return
                             set outputText to outputText & "   From: " & messageSender & return
                             set outputText to outputText & "   Date: " & (messageDate as string) & return
                             set outputText to outputText & "   Mailbox: " & mailboxName & return
 
-                            -- Get content preview
+                            -- Get content
                             try
                                 set msgContent to content of aMessage
                                 set AppleScript's text item delimiters to {{return, linefeed}}
@@ -372,12 +359,12 @@ def get_email_with_content(
 
                                 -- Handle content length limit (0 = unlimited)
                                 if {max_content_length} > 0 and length of cleanText > {max_content_length} then
-                                    set contentPreview to text 1 thru {max_content_length} of cleanText & "..."
+                                    set contentText to text 1 thru {max_content_length} of cleanText & "..."
                                 else
-                                    set contentPreview to cleanText
+                                    set contentText to cleanText
                                 end if
 
-                                set outputText to outputText & "   Content: " & contentPreview & return
+                                set outputText to outputText & "   Content: " & contentText & return
                             on error
                                 set outputText to outputText & "   Content: [Not available]" & return
                             end try
@@ -400,16 +387,15 @@ def get_email_with_content(
                                 end repeat
                             end if
 
-                            set outputText to outputText & return
-                            set resultCount to resultCount + 1
+                            set foundEmail to true
                         end if
                     end try
                 end repeat
             end repeat
 
-            set outputText to outputText & "========================================" & return
-            set outputText to outputText & "FOUND: " & resultCount & " matching email(s)" & return
-            set outputText to outputText & "========================================" & return
+            if not foundEmail then
+                return "Error: No email found with message ID: {escaped_id}"
+            end if
 
         on error errMsg
             return "Error: " & errMsg
