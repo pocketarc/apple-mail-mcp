@@ -1,8 +1,10 @@
 """Search tools: finding and filtering emails."""
 
+import email as email_module
 import json
 import re
 from datetime import datetime
+from email.policy import default as email_policy
 from typing import Optional, List, Dict, Any
 from urllib.parse import quote
 
@@ -11,6 +13,7 @@ from apple_mail_mcp.core import (
     contains_any_condition,
     inject_preferences,
     escape_applescript,
+    normalize_message_id,
     normalize_search_terms,
     run_applescript,
     LOWERCASE_HANDLER,
@@ -733,3 +736,158 @@ def get_email_thread(
 
     result = run_applescript(script)
     return result
+
+
+def _strip_attachment_content(source: str) -> str:
+    """
+    Replace binary attachment content with descriptive placeholders.
+
+    Parses the RFC 822 email source and replaces the payload of binary
+    attachments and inline images with placeholders like:
+    [Attachment #1: image.png (image/png, 45.2 KB)]
+    """
+    try:
+        msg = email_module.message_from_string(source, policy=email_policy)
+    except Exception:
+        return source
+
+    attachment_num = 0
+
+    def should_strip(part):
+        """Determine if a MIME part's content should be stripped."""
+        content_type = part.get_content_type()
+        maintype = content_type.split('/')[0]
+        disposition = part.get_content_disposition()
+
+        if content_type in ('text/plain', 'text/html'):
+            return False
+
+        if disposition in ('attachment', 'inline'):
+            return True
+
+        if maintype in ('image', 'audio', 'video', 'application'):
+            return True
+
+        return False
+
+    def process_part(part):
+        """Process a single MIME part, stripping if necessary."""
+        nonlocal attachment_num
+
+        if part.is_multipart():
+            return
+
+        if should_strip(part):
+            attachment_num += 1
+
+            filename = part.get_filename() or "unnamed"
+            content_type = part.get_content_type()
+
+            try:
+                payload = part.get_payload(decode=True)
+                if payload:
+                    size_bytes = len(payload)
+                    if size_bytes >= 1024 * 1024:
+                        size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+                    elif size_bytes >= 1024:
+                        size_str = f"{size_bytes / 1024:.1f} KB"
+                    else:
+                        size_str = f"{size_bytes} bytes"
+                else:
+                    size_str = "unknown size"
+            except Exception:
+                size_str = "unknown size"
+
+            placeholder = f"[Attachment #{attachment_num}: {filename} ({content_type}, {size_str})]"
+            part.set_payload(placeholder)
+
+            if 'Content-Transfer-Encoding' in part:
+                del part['Content-Transfer-Encoding']
+
+    for part in msg.walk():
+        process_part(part)
+
+    return msg.as_string()
+
+
+@mcp.tool()
+def get_email_source(
+    account: str,
+    subject_keyword: Optional[str] = None,
+    message_id: Optional[str] = None,
+    mailbox: str = "Archive"
+) -> str:
+    """
+    Get the RFC 822 source of an email including all headers and MIME parts.
+
+    Specify either subject_keyword OR message_id to find the email.
+    message_id is more precise (use the ID returned by list_inbox_emails, search_emails, etc.)
+
+    Returns the email source with:
+    - All headers (Return-Path, Received, MIME-Version, etc.)
+    - MIME structure with boundaries
+    - text/plain and text/html parts
+    - Binary attachments replaced with placeholders like [Attachment #1: file.png (image/png, 45.2 KB)]
+
+    Useful for:
+    - Accessing HTML content
+    - Debugging email issues
+    - Extracting specific headers
+    - Email forensics
+
+    Args:
+        account: Account name (e.g., "Gmail", "Work")
+        subject_keyword: Keyword to search for in email subjects (substring match)
+        message_id: Exact message ID for precise matching (e.g., "<abc123@example.com>")
+        mailbox: Mailbox to search (default: "Archive")
+
+    Returns:
+        RFC 822 email source with binary attachments replaced by placeholders
+    """
+    if not subject_keyword and not message_id:
+        return "Error: Either subject_keyword or message_id is required"
+
+    safe_account = escape_applescript(account)
+    safe_mailbox = escape_applescript(mailbox)
+
+    if message_id:
+        escaped_id = escape_applescript(normalize_message_id(message_id))
+        whose_clause = f'message id is "{escaped_id}"'
+        search_desc = f"message_id: {message_id}"
+    else:
+        escaped_keyword = escape_applescript(subject_keyword)
+        whose_clause = f'subject contains "{escaped_keyword}"'
+        search_desc = f"subject: {subject_keyword}"
+
+    script = f'''
+    tell application "Mail"
+        try
+            set targetAccount to account "{safe_account}"
+            try
+                set targetMailbox to mailbox "{safe_mailbox}" of targetAccount
+            on error
+                if "{safe_mailbox}" is "INBOX" then
+                    set targetMailbox to mailbox "Inbox" of targetAccount
+                else
+                    error "Mailbox not found: {safe_mailbox}"
+                end if
+            end try
+
+            set matchingMessages to every message of targetMailbox whose {whose_clause}
+
+            if (count of matchingMessages) is 0 then
+                return "Error: No email found matching {search_desc}"
+            end if
+
+            return source of item 1 of matchingMessages
+
+        on error errMsg
+            return "Error: " & errMsg
+        end try
+    end tell
+    '''
+
+    result = run_applescript(script)
+    if result.startswith("Error:"):
+        return result
+    return _strip_attachment_content(result)

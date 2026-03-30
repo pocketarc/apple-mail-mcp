@@ -18,6 +18,14 @@ def inject_preferences(func):
     return func
 
 
+def normalize_message_id(value: str) -> str:
+    """Strip optional angle brackets from an RFC 2822 Message-ID."""
+    value = value.strip()
+    if value.startswith("<") and value.endswith(">"):
+        value = value[1:-1]
+    return value
+
+
 def escape_applescript(value: str) -> str:
     """Escape a string for safe injection into AppleScript double-quoted strings.
 

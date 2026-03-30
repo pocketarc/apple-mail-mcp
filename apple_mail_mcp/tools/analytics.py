@@ -4,7 +4,7 @@ import os
 from typing import Optional, List, Dict, Any
 
 from apple_mail_mcp.server import mcp
-from apple_mail_mcp.core import inject_preferences, escape_applescript, run_applescript, inbox_mailbox_script
+from apple_mail_mcp.core import inject_preferences, escape_applescript, normalize_message_id, run_applescript, inbox_mailbox_script, build_mailbox_ref
 from apple_mail_mcp.constants import SKIP_FOLDERS
 
 
@@ -12,80 +12,64 @@ from apple_mail_mcp.constants import SKIP_FOLDERS
 @inject_preferences
 def list_email_attachments(
     account: str,
-    subject_keyword: str,
-    max_results: int = 1
+    message_id: str,
+    mailbox: str = "INBOX",
 ) -> str:
     """
-    List attachments for emails matching a subject keyword.
+    List attachments for an email identified by message ID.
 
     Args:
         account: Account name (e.g., "Gmail", "Work", "Personal")
-        subject_keyword: Keyword to search for in email subjects
-        max_results: Maximum number of matching emails to check (default: 1)
+        message_id: Exact message ID (e.g., "<abc123@example.com>"). Get this from list_inbox_emails, search_emails, etc.
+        mailbox: Mailbox to search (default: "INBOX")
 
     Returns:
         List of attachments with their names and sizes
     """
-
-    # Escape for AppleScript
-    escaped_keyword = escape_applescript(subject_keyword)
     escaped_account = escape_applescript(account)
+    escaped_id = escape_applescript(normalize_message_id(message_id))
 
     script = f'''
     tell application "Mail"
-        set outputText to "ATTACHMENTS FOR: {escaped_keyword}" & return & return
-        set resultCount to 0
+        set outputText to "ATTACHMENTS" & return & return
 
         try
             set targetAccount to account "{escaped_account}"
-            {inbox_mailbox_script("inboxMailbox", "targetAccount")}
-            set inboxMessages to every message of inboxMailbox
+            {build_mailbox_ref(mailbox)}
+            set matchingMessages to every message of targetMailbox whose message id is "{escaped_id}"
 
-            repeat with aMessage in inboxMessages
-                if resultCount >= {max_results} then exit repeat
+            if (count of matchingMessages) is 0 then
+                return "Error: No email found with message ID: {escaped_id}"
+            end if
 
-                try
-                    set messageSubject to subject of aMessage
+            set aMessage to item 1 of matchingMessages
+            set messageSubject to subject of aMessage
+            set messageSender to sender of aMessage
+            set messageDate to date received of aMessage
 
-                    -- Check if subject contains keyword
-                    if messageSubject contains "{escaped_keyword}" then
-                        set messageSender to sender of aMessage
-                        set messageDate to date received of aMessage
+            set outputText to outputText & messageSubject & return
+            set outputText to outputText & "   From: " & messageSender & return
+            set outputText to outputText & "   Date: " & (messageDate as string) & return & return
 
-                        set outputText to outputText & "✉ " & messageSubject & return
-                        set outputText to outputText & "   From: " & messageSender & return
-                        set outputText to outputText & "   Date: " & (messageDate as string) & return & return
+            set msgAttachments to mail attachments of aMessage
+            set attachmentCount to count of msgAttachments
 
-                        -- Get attachments
-                        set msgAttachments to mail attachments of aMessage
-                        set attachmentCount to count of msgAttachments
+            if attachmentCount > 0 then
+                set outputText to outputText & "Attachments (" & attachmentCount & "):" & return
 
-                        if attachmentCount > 0 then
-                            set outputText to outputText & "   Attachments (" & attachmentCount & "):" & return
-
-                            repeat with anAttachment in msgAttachments
-                                set attachmentName to name of anAttachment
-                                try
-                                    set attachmentSize to size of anAttachment
-                                    set sizeInKB to (attachmentSize / 1024) as integer
-                                    set outputText to outputText & "   📎 " & attachmentName & " (" & sizeInKB & " KB)" & return
-                                on error
-                                    set outputText to outputText & "   📎 " & attachmentName & return
-                                end try
-                            end repeat
-                        else
-                            set outputText to outputText & "   No attachments" & return
-                        end if
-
-                        set outputText to outputText & return
-                        set resultCount to resultCount + 1
-                    end if
-                end try
-            end repeat
-
-            set outputText to outputText & "========================================" & return
-            set outputText to outputText & "FOUND: " & resultCount & " matching email(s)" & return
-            set outputText to outputText & "========================================" & return
+                repeat with anAttachment in msgAttachments
+                    set attachmentName to name of anAttachment
+                    try
+                        set attachmentSize to size of anAttachment
+                        set sizeInKB to (attachmentSize / 1024) as integer
+                        set outputText to outputText & "   " & attachmentName & " (" & sizeInKB & " KB)" & return
+                    on error
+                        set outputText to outputText & "   " & attachmentName & return
+                    end try
+                end repeat
+            else
+                set outputText to outputText & "No attachments" & return
+            end if
 
         on error errMsg
             return "Error: " & errMsg

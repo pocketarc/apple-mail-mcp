@@ -64,14 +64,20 @@ def list_inbox_emails(
     if output_format == "json":
         return _list_inbox_emails_json(account, max_emails, include_read, include_content)
 
+    escaped_account = escape_applescript(account) if account else None
+    account_filter = f'if accountName is "{escaped_account}" then' if account else ""
+    account_filter_end = "end if" if account else ""
+    header = f"INBOX EMAILS - ACCOUNT: {escaped_account}" if account else "INBOX EMAILS - ALL ACCOUNTS"
+
     script = f"""
     tell application "Mail"
-        set outputText to "INBOX EMAILS - ALL ACCOUNTS" & return & return
+        set outputText to "{header}" & return & return
         set totalCount to 0
         set allAccounts to every account
 
         repeat with anAccount in allAccounts
             set accountName to name of anAccount
+            {account_filter}
 
             try
                 {inbox_mailbox_script("inboxMailbox", "anAccount")}
@@ -80,7 +86,7 @@ def list_inbox_emails(
 
                 if messageCount > 0 then
                     set outputText to outputText & "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" & return
-                    set outputText to outputText & "📧 ACCOUNT: " & accountName & " (" & messageCount & " messages)" & return
+                    set outputText to outputText & "ACCOUNT: " & accountName & " (" & messageCount & " messages)" & return
                     set outputText to outputText & "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" & return & return
 
                     set currentIndex to 0
@@ -93,6 +99,7 @@ def list_inbox_emails(
                             set messageSender to sender of aMessage
                             set messageDate to date received of aMessage
                             set messageRead to read status of aMessage
+                            set messageId to message id of aMessage
 
                             set shouldInclude to true
                             if not {str(include_read).lower()} and messageRead then
@@ -101,12 +108,13 @@ def list_inbox_emails(
 
                             if shouldInclude then
                                 if messageRead then
-                                    set readIndicator to "✓"
+                                    set readIndicator to "read"
                                 else
-                                    set readIndicator to "✉"
+                                    set readIndicator to "unread"
                                 end if
 
                                 set outputText to outputText & readIndicator & " " & messageSubject & return
+                                set outputText to outputText & "   ID: " & messageId & return
                                 set outputText to outputText & "   From: " & messageSender & return
                                 set outputText to outputText & "   Date: " & (messageDate as string) & return
 
@@ -120,9 +128,10 @@ def list_inbox_emails(
                     end repeat
                 end if
             on error errMsg
-                set outputText to outputText & "⚠ Error accessing inbox for account " & accountName & return
+                set outputText to outputText & "Error accessing inbox for account " & accountName & return
                 set outputText to outputText & "   " & errMsg & return & return
             end try
+            {account_filter_end}
         end repeat
 
         set outputText to outputText & "========================================" & return

@@ -9,6 +9,7 @@ from apple_mail_mcp.core import (
     equals_any_numeric_condition,
     inject_preferences,
     escape_applescript,
+    normalize_message_id,
     normalize_message_ids,
     normalize_search_terms,
     run_applescript,
@@ -23,77 +24,23 @@ from apple_mail_mcp.core import (
 def move_email(
     account: str,
     to_mailbox: str,
-    subject_keyword: Optional[str] = None,
+    message_id: str,
     from_mailbox: str = "INBOX",
-    max_moves: int = 50,
-    subject_keywords: Optional[List[str]] = None,
-    sender: Optional[str] = None,
-    older_than_days: Optional[int] = None,
-    dry_run: bool = False,
-    only_read: bool = False,
 ) -> str:
     """
-    Move email(s) matching filters from one mailbox to another.
-
-    Supports subject, sender, and date filters. Use dry_run=True to preview
-    matches without moving. Set only_read=True to skip unread emails (useful
-    for archiving). For archiving to "Archive", just set to_mailbox="Archive".
+    Move an email from one mailbox to another.
 
     Args:
         account: Account name (e.g., "Gmail", "Work")
         to_mailbox: Destination mailbox name. For nested mailboxes, use "/" separator (e.g., "Projects/Amplify Impact")
-        subject_keyword: Optional keyword to search for in email subjects
+        message_id: Exact message ID for precise matching (e.g., "<abc123@example.com>"). Get this from list_inbox_emails, search_emails, etc.
         from_mailbox: Source mailbox name (default: "INBOX")
-        max_moves: Maximum number of emails to move (default: 50, safety limit)
-        subject_keywords: Optional list of keywords to match in subjects; matches any keyword
-        sender: Optional sender to filter emails by
-        older_than_days: Optional age filter - only move emails older than N days
-        dry_run: If True, preview what would be moved without acting (default: False)
-        only_read: If True, only move emails that have been read (default: False)
 
     Returns:
-        Confirmation message with details of moved emails
+        Confirmation message with details of moved email
     """
-
-    subject_terms = normalize_search_terms(subject_keyword, subject_keywords)
-    if not subject_terms and not sender and not older_than_days:
-        return (
-            "Error: At least one filter is required (subject_keyword, sender, "
-            "or older_than_days). This prevents accidentally moving everything."
-        )
-
     safe_account = escape_applescript(account)
-    safe_from = escape_applescript(from_mailbox)
-    safe_to = escape_applescript(to_mailbox)
-
-    # Build filter condition for the loop body (uses local vars)
-    condition_str = build_filter_condition(
-        subject=subject_keyword if not subject_keywords else None,
-        sender=sender,
-    )
-    # For multi-keyword subject matching, override the subject part
-    if subject_terms:
-        subj_cond = " or ".join(
-            f'messageSubject contains "{escape_applescript(t)}"' for t in subject_terms
-        )
-        subj_cond = f"({subj_cond})"
-        if sender:
-            condition_str = f'{subj_cond} and messageSender contains "{escape_applescript(sender)}"'
-        else:
-            condition_str = subj_cond
-
-    if only_read:
-        read_cond = "messageRead is true"
-        condition_str = (
-            f"{condition_str} and {read_cond}" if condition_str != "true" else read_cond
-        )
-
-    # Date filter
-    date_setup = ""
-    date_cond = ""
-    if older_than_days and older_than_days > 0:
-        date_setup = f"set cutoffDate to (current date) - ({older_than_days} * days)"
-        date_cond = " and messageDate < cutoffDate"
+    escaped_id = escape_applescript(normalize_message_id(message_id))
 
     # Build nested mailbox reference for destination
     mailbox_parts = to_mailbox.split("/")
@@ -103,93 +50,68 @@ def move_email(
             dest_ref += f'mailbox "{escape_applescript(mailbox_parts[i])}" of '
         dest_ref += "targetAccount"
     else:
-        dest_ref = f'mailbox "{safe_to}" of targetAccount'
-
-    if dry_run:
-        mode_label = "DRY RUN - PREVIEW MOVE"
-        move_action = ""
-        result_prefix = "Would move"
-    else:
-        mode_label = "MOVING EMAILS"
-        move_action = "move aMessage to destMailbox"
-        result_prefix = "Moved"
-
-    dest_setup = "" if dry_run else f"""
-            set destMailbox to {dest_ref}"""
+        dest_ref = f'mailbox "{escape_applescript(to_mailbox)}" of targetAccount'
 
     script = f'''
     tell application "Mail"
-        with timeout of 300 seconds
-            set outputText to "{mode_label}: {safe_from} -> {safe_to}" & return & return
-            set moveCount to 0
+        set outputText to "MOVING EMAIL" & return & return
 
-            try
-                set targetAccount to account "{safe_account}"
-                {build_mailbox_ref(from_mailbox, var_name="sourceMailbox")}
-                {dest_setup}
-                {date_setup}
+        try
+            set targetAccount to account "{safe_account}"
+            {build_mailbox_ref(from_mailbox, var_name="sourceMailbox")}
+            set destMailbox to {dest_ref}
+            set matchingMessages to every message of sourceMailbox whose message id is "{escaped_id}"
 
-                set mailboxMessages to every message of sourceMailbox
+            if (count of matchingMessages) is 0 then
+                return "No email found with the specified message_id in {from_mailbox}"
+            end if
 
-                repeat with aMessage in mailboxMessages
-                    if moveCount >= {max_moves} then exit repeat
+            set aMessage to item 1 of matchingMessages
+            set messageSubject to subject of aMessage
+            set messageSender to sender of aMessage
+            set messageDate to date received of aMessage
 
-                    try
-                        set messageSubject to subject of aMessage
-                        set messageSender to sender of aMessage
-                        set messageDate to date received of aMessage
-                        set messageRead to read status of aMessage
+            move aMessage to destMailbox
 
-                        if {condition_str}{date_cond} then
-                            {move_action}
+            set outputText to outputText & "Moved: " & messageSubject & return
+            set outputText to outputText & "   From: " & messageSender & return
+            set outputText to outputText & "   Date: " & (messageDate as string) & return
+            set outputText to outputText & "   {from_mailbox} -> {to_mailbox}" & return
 
-                            set outputText to outputText & "{result_prefix}: " & messageSubject & return
-                            set outputText to outputText & "   From: " & messageSender & return
-                            set outputText to outputText & "   Date: " & (messageDate as string) & return & return
+        on error errMsg
+            return "Error: " & errMsg & return & "Check that account and mailbox names are correct. For nested mailboxes, use '/' separator."
+        end try
 
-                            set moveCount to moveCount + 1
-                        end if
-                    end try
-                end repeat
-
-                set outputText to outputText & "========================================" & return
-                set outputText to outputText & "TOTAL: " & moveCount & " email(s) {result_prefix.lower()}" & return
-                if moveCount >= {max_moves} then
-                    set outputText to outputText & "(max_moves limit reached)" & return
-                end if
-                set outputText to outputText & "========================================" & return
-
-            on error errMsg
-                return "Error: " & errMsg & return & "Check that account and mailbox names are correct. For nested mailboxes, use '/' separator."
-            end try
-
-            return outputText
-        end timeout
+        return outputText
     end tell
     '''
 
-    result = run_applescript(script, timeout=300)
+    result = run_applescript(script)
     return result
 
 
 @mcp.tool()
 @inject_preferences
 def save_email_attachment(
-    account: str, subject_keyword: str, attachment_name: str, save_path: str
+    account: str,
+    message_id: str,
+    attachment_name: str,
+    save_path: str,
+    mailbox: str = "INBOX",
 ) -> str:
     """
     Save a specific attachment from an email to disk.
 
     Args:
         account: Account name (e.g., "Gmail", "Work", "Personal")
-        subject_keyword: Keyword to search for in email subjects
+        message_id: Exact message ID (e.g., "<abc123@example.com>"). Get this from list_inbox_emails, search_emails, etc.
         attachment_name: Name of the attachment to save
         save_path: Full path where to save the attachment
+        mailbox: Mailbox to search (default: "INBOX")
 
     Returns:
         Confirmation message with save location
     """
-
     # Expand tilde in save_path (POSIX file in AppleScript does not expand ~)
     expanded_path = os.path.expanduser(save_path)
 
@@ -221,9 +143,8 @@ def save_email_attachment(
 
     expanded_path = resolved_path
 
-    # Escape for AppleScript
     escaped_account = escape_applescript(account)
-    escaped_keyword = escape_applescript(subject_keyword)
+    escaped_id = escape_applescript(normalize_message_id(message_id))
     escaped_attachment = escape_applescript(attachment_name)
     escaped_path = escape_applescript(expanded_path)
 
@@ -233,43 +154,37 @@ def save_email_attachment(
 
         try
             set targetAccount to account "{escaped_account}"
-            {inbox_mailbox_script("inboxMailbox", "targetAccount")}
-            set inboxMessages to every message of inboxMailbox
+            {build_mailbox_ref(mailbox)}
+            set matchingMessages to every message of targetMailbox whose message id is "{escaped_id}"
+
+            if (count of matchingMessages) is 0 then
+                return "Error: No email found with message ID: {escaped_id}"
+            end if
+
+            set aMessage to item 1 of matchingMessages
+            set messageSubject to subject of aMessage
+            set msgAttachments to mail attachments of aMessage
             set foundAttachment to false
 
-            repeat with aMessage in inboxMessages
-                try
-                    set messageSubject to subject of aMessage
+            repeat with anAttachment in msgAttachments
+                set attachmentFileName to name of anAttachment
 
-                    -- Check if subject contains keyword
-                    if messageSubject contains "{escaped_keyword}" then
-                        set msgAttachments to mail attachments of aMessage
+                if attachmentFileName contains "{escaped_attachment}" then
+                    save anAttachment in POSIX file "{escaped_path}"
 
-                        repeat with anAttachment in msgAttachments
-                            set attachmentFileName to name of anAttachment
+                    set outputText to "Attachment saved successfully!" & return & return
+                    set outputText to outputText & "Email: " & messageSubject & return
+                    set outputText to outputText & "Attachment: " & attachmentFileName & return
+                    set outputText to outputText & "Saved to: {escaped_path}" & return
 
-                            if attachmentFileName contains "{escaped_attachment}" then
-                                -- Save the attachment
-                                save anAttachment in POSIX file "{escaped_path}"
-
-                                set outputText to "✓ Attachment saved successfully!" & return & return
-                                set outputText to outputText & "Email: " & messageSubject & return
-                                set outputText to outputText & "Attachment: " & attachmentFileName & return
-                                set outputText to outputText & "Saved to: {escaped_path}" & return
-
-                                set foundAttachment to true
-                                exit repeat
-                            end if
-                        end repeat
-
-                        if foundAttachment then exit repeat
-                    end if
-                end try
+                    set foundAttachment to true
+                    exit repeat
+                end if
             end repeat
 
             if not foundAttachment then
-                set outputText to "⚠ Attachment not found" & return
-                set outputText to outputText & "Email keyword: {escaped_keyword}" & return
+                set outputText to "Attachment not found" & return
+                set outputText to outputText & "Email: " & messageSubject & return
                 set outputText to outputText & "Attachment name: {escaped_attachment}" & return
             end if
 
